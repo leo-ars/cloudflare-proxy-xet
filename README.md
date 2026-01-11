@@ -31,11 +31,15 @@ docker buildx build \
   .
 
 # Run the proxy
-export HF_TOKEN=your_huggingface_token
-docker run -p 8080:8080 -e HF_TOKEN=$HF_TOKEN xet-proxy:latest
+docker run -p 8080:8080 xet-proxy:latest
 
-# Test it
+# Test it (health check doesn't need auth)
 curl http://localhost:8080/health
+
+# Download with Bearer token
+curl http://localhost:8080/download/owner/repo/file \
+  -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \
+  -o file.bin
 ```
 
 ### Local Development
@@ -48,18 +52,15 @@ zig build -Doptimize=ReleaseFast
 cd proxy-rust && cargo build --release
 
 # Run
-export HF_TOKEN=your_token
 export ZIG_BIN_PATH=./zig-out/bin/xet-download
 ./proxy-rust/target/release/xet-proxy
+
+# All requests require Bearer token in Authorization header
 ```
 
 ## Authentication
 
-The proxy supports flexible authentication with automatic fallback:
-
-### Option 1: Bearer Token (Recommended for multi-user)
-
-Pass token with each request using the `Authorization` header:
+All download requests require authentication via Bearer token in the `Authorization` header:
 
 ```bash
 curl http://localhost:8080/download/owner/repo/file \
@@ -67,19 +68,10 @@ curl http://localhost:8080/download/owner/repo/file \
   -o file.bin
 ```
 
-### Option 2: Environment Variable (Convenient for single-user)
-
-Set once, applies to all requests:
-
-```bash
-export HF_TOKEN=hf_xxxxxxxxxxxxx
-docker run -e HF_TOKEN=$HF_TOKEN xet-proxy:latest
-
-# No header needed
-curl http://localhost:8080/download/owner/repo/file -o file.bin
-```
-
-**Priority:** Bearer token takes precedence over environment variable. This allows multi-tenant deployments where different users can provide their own tokens per request.
+This clean approach allows:
+- **Multi-tenant support**: Different users provide their own tokens per request
+- **Security**: No server-wide token that could be compromised
+- **Flexibility**: Each request can use a different token if needed
 
 ## API Endpoints
 

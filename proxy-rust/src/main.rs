@@ -24,7 +24,6 @@ const VERSION: &str = "0.1.0";
 
 #[derive(Clone)]
 struct AppState {
-    hf_token: String,
     zig_bin_path: String,
 }
 
@@ -45,8 +44,6 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // Get configuration from environment
-    // HF_TOKEN is optional - can be provided per-request via Authorization header
-    let hf_token = std::env::var("HF_TOKEN").unwrap_or_else(|_| String::new());
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "8080".to_string())
         .parse::<u16>()
@@ -55,7 +52,6 @@ async fn main() {
         .unwrap_or_else(|_| "/usr/local/bin/xet-download".to_string());
 
     let state = Arc::new(AppState {
-        hf_token,
         zig_bin_path,
     });
 
@@ -133,16 +129,7 @@ async fn root() -> Response {
     </div>
     
     <h2>Authentication</h2>
-    <p>Two methods available (Bearer token takes priority):</p>
-    
-    <h3>Method 1: Environment Variable</h3>
-    <pre>
-export HF_TOKEN=hf_xxxxxxxxxxxxx
-docker run -e HF_TOKEN=$HF_TOKEN xet-proxy:latest
-curl http://localhost:8080/download/owner/repo/file -o file.bin
-    </pre>
-    
-    <h3>Method 2: Bearer Token (Per-request)</h3>
+    <p>All requests require authentication via Bearer token in the Authorization header.</p>
     <pre>
 curl http://localhost:8080/download/owner/repo/file \\
   -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \\
@@ -176,9 +163,8 @@ curl http://localhost:8080/health
         .unwrap()
 }
 
-/// Extract HF token from request headers, falling back to environment variable
-fn extract_token(headers: &HeaderMap, fallback: &str) -> Result<String, AppError> {
-    // Try Authorization: Bearer header first
+/// Extract HF token from Authorization: Bearer header
+fn extract_token(headers: &HeaderMap) -> Result<String, AppError> {
     if let Some(auth_header) = headers.get(header::AUTHORIZATION) {
         if let Ok(auth_str) = auth_header.to_str() {
             // Check if it starts with "Bearer "
@@ -190,14 +176,9 @@ fn extract_token(headers: &HeaderMap, fallback: &str) -> Result<String, AppError
         }
     }
     
-    // Fall back to environment variable token
-    if !fallback.is_empty() {
-        return Ok(fallback.to_string());
-    }
-    
-    // No token available
+    // No token provided
     Err(AppError::Unauthorized(
-        "No HF_TOKEN provided. Set HF_TOKEN environment variable or use Authorization: Bearer header".to_string()
+        "Authorization header required. Use: Authorization: Bearer hf_xxxxxxxxxxxxx".to_string()
     ))
 }
 
@@ -218,8 +199,8 @@ async fn download_by_path(
     let repo_id = format!("{}/{}", owner, repo);
     info!("Download request: repo={}, file={}", repo_id, file);
 
-    // Extract token from headers or use environment variable
-    let hf_token = extract_token(&headers, &state.hf_token)?;
+    // Extract token from Authorization header
+    let hf_token = extract_token(&headers)?;
 
     // First, list files to get the XET hash
     let output = Command::new(&state.zig_bin_path)
@@ -275,8 +256,8 @@ async fn download_by_hash(
         ));
     }
 
-    // Extract token from headers or use environment variable
-    let hf_token = extract_token(&headers, &state.hf_token)?;
+    // Extract token from Authorization header
+    let hf_token = extract_token(&headers)?;
 
     download_by_hash_impl(state, hash, hf_token).await
 }
