@@ -91,25 +91,9 @@ curl http://localhost:8080/download-hash/89dbfa4888600b29be17ddee8bdbf9c48999c81
 ### TLS Certificate Error
 If you see `CertificateSignatureNamedCurveUnsupported`:
 
-**Cause:** Cloudflare WARP or VPN intercepting HTTPS connections
+**Cause:** VPN or proxy software intercepting HTTPS connections
 
-**Solutions:**
-1. Disable WARP/VPN temporarily for testing
-2. Use the WARP-compatible Docker build (see DOCKER.md)
-3. Extract and inject WARP certificates (see scripts/extract-warp-cert.sh)
-
-### Testing Without Network Issues
-
-If you have WARP/VPN that can't be disabled:
-
-```bash
-# Use the already downloaded file for testing
-ls -lh MiMo-7B-RL-Q8_0.gguf
-# Should show: 8106510944 bytes (7.55 GB)
-
-# Or use Docker with WARP support
-docker-compose -f docker-compose.warp.yml up
-```
+**Solution:** Disable VPN/proxy software temporarily for testing
 
 ## Command Reference
 
@@ -168,26 +152,20 @@ docker-compose -f docker-compose.warp.yml up
 - [x] Rust proxy builds successfully
 - [x] Rust proxy health endpoint works
 - [x] Rust proxy root page returns HTML
-- [ ] Rust proxy file download (requires WARP disabled or certificate injection)
-- [ ] Rust proxy hash-based download (requires WARP disabled or certificate injection)
+- [ ] Rust proxy file download
+- [ ] Rust proxy hash-based download
 
 ## Next Steps for Full Testing
 
-1. **Disable WARP/VPN** and test actual file downloads:
+1. **Test actual file downloads:**
    ```bash
    ./proxy-rust/target/release/xet-proxy &
-   curl http://localhost:8080/download/jedisct1/MiMo-7B-RL-GGUF/MiMo-7B-RL-Q8_0.gguf -o test.gguf
+   curl http://localhost:8080/download/jedisct1/MiMo-7B-RL-GGUF/MiMo-7B-RL-Q8_0.gguf \
+     -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \
+     -o test.gguf
    ```
 
-2. **Or use Docker with WARP support:**
+2. **Or use Docker:**
    ```bash
-   ./scripts/extract-warp-cert.sh  # One-time setup
-   docker-compose -f docker-compose.warp.yml up
-   ```
-
-3. **Or test with the already downloaded file:**
-   ```bash
-   # Verify the existing download
-   ls -lh MiMo-7B-RL-Q8_0.gguf
-   # Use it for local testing
+   docker-compose -f docker-compose.proxy.yml up
    ```

@@ -150,10 +150,12 @@ docker load -i xet-proxy.tar
 
 ## Performance
 
-Tested with 7.73GB model download:
+Tested with 7.73GB model download on MacBook Pro M2 (Orange España domestic network):
 - **Speed:** 35-45 MB/s average
 - **Memory:** 200-500 MB
 - **Time:** ~3-4 minutes for 7.5GB file
+
+*Performance may vary depending on network connection and HuggingFace CDN location.*
 
 ## Development
 

@@ -420,16 +420,16 @@ This codebase implements the official XET protocol specification. When making ch
 
 ### TLS Certificate Issues with VPN/Proxy Software
 
-If you encounter TLS certificate errors like `CertificateSignatureNamedCurveUnsupported` when connecting to HuggingFace's API, this is likely caused by VPN or proxy software (like Cloudflare WARP) intercepting HTTPS connections.
+If you encounter TLS certificate errors like `CertificateSignatureNamedCurveUnsupported` when connecting to HuggingFace's API, this is likely caused by VPN or proxy software intercepting HTTPS connections.
 
 **Error**: `TlsInitializationFailed` or `CertificateSignatureNamedCurveUnsupported`
 
-**Solution**: Disable VPN/proxy software (e.g., Cloudflare WARP) temporarily, or configure it to exclude HuggingFace domains.
+**Solution**: Disable VPN/proxy software temporarily, or configure it to exclude HuggingFace domains.
 
 **Example working download**:
 ```bash
-# Download a specific file (requires HF_TOKEN environment variable)
-HF_TOKEN=hf_xxx zig build run-example-download -- jedisct1/MiMo-7B-RL-GGUF MiMo-7B-RL-Q8_0.gguf
+# Download a specific file
+zig build run-example-download -- jedisct1/MiMo-7B-RL-GGUF MiMo-7B-RL-Q8_0.gguf
 
 # Example output:
 # Download complete!
@@ -562,22 +562,6 @@ curl http://localhost:8080/health
 
 # Stop and remove
 docker-compose -f docker-compose.proxy.yml down
-```
-
-### WARP-Compatible Docker (Optional)
-
-For environments where Cloudflare WARP cannot be disabled:
-
-```bash
-# Extract WARP certificate (one-time)
-./scripts/extract-warp-cert.sh
-
-# Build and run
-export HF_TOKEN=hf_xxx
-docker-compose -f docker-compose.warp.yml up -d
-
-# Test
-curl http://localhost:8080/health
 ```
 
 ### Proxy Server Endpoints

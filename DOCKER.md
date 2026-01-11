@@ -1,330 +1,326 @@
 # Docker Deployment Guide
 
-This guide explains how to run the XET Proxy Server in Docker with or without Cloudflare WARP.
+This guide explains how to run the XET Proxy Server in Docker.
 
 ## Overview
 
 The XET Proxy Server provides an HTTP API to download files from HuggingFace using the XET protocol. It streams files as they are reconstructed, avoiding buffering entire files in memory.
 
-**Two Docker configurations are available:**
-1. **Standard** (`Dockerfile`) - Requires Cloudflare WARP to be **disabled**
-2. **WARP-Compatible** (`Dockerfile.warp`) - Works with Cloudflare WARP **enabled**
+**Key Features:**
+- Streaming downloads (no disk buffering)
+- Multi-platform support (AMD64, ARM64)
+- Bearer token authentication
+- Small footprint (~10-40 MB)
 
 ## Quick Start
 
-### Option 1: Without WARP (Standard)
+### Build Docker Image
 
 ```bash
-# Set your HuggingFace token
-export HF_TOKEN=hf_xxx
+# Build for AMD64 (servers)
+docker buildx build \
+  --platform linux/amd64 \
+  --file Dockerfile.proxy \
+  --tag xet-proxy:latest \
+  --load \
+  .
 
-# Disable Cloudflare WARP in system settings
+# Or build for ARM64 (Apple Silicon)
+docker buildx build \
+  --platform linux/arm64 \
+  --file Dockerfile.proxy \
+  --tag xet-proxy:latest \
+  --load \
+  .
+```
 
-# Build and run
-docker-compose up -d
+### Run the Server
+
+```bash
+# Run the proxy
+docker run -d -p 8080:8080 --name xet-proxy xet-proxy:latest
 
 # Test
 curl http://localhost:8080/health
 ```
 
-### Option 2: With WARP (WARP-Compatible)
+### Using Docker Compose
 
 ```bash
-# Extract WARP certificate (one-time setup)
-./scripts/extract-warp-cert.sh
-
-# Set your HuggingFace token
-export HF_TOKEN=hf_xxx
-
-# Keep Cloudflare WARP enabled
-
 # Build and run
-docker-compose -f docker-compose.warp.yml up -d
+docker-compose -f docker-compose.proxy.yml up -d
 
 # Test
 curl http://localhost:8080/health
+
+# Stop
+docker-compose -f docker-compose.proxy.yml down
 ```
 
 ## API Endpoints
 
 ### `GET /health`
-Health check endpoint
+
+Health check endpoint (no authentication required).
 
 ```bash
 curl http://localhost:8080/health
-# {"status":"ok","version":"0.1.0"}
+# Response: {"status":"ok","version":"0.1.0"}
 ```
 
-### `GET /download/:repo_id/:file_path`
-Download file by repository and path
+### `GET /download/:owner/:repo/*file`
+
+Download a file by repository path (requires Bearer token).
 
 ```bash
-curl http://localhost:8080/download/jedisct1/MiMo-7B-RL-GGUF/MiMo-7B-RL-Q8_0.gguf \
+curl http://localhost:8080/download/jedisct1/MiMo-7B-RL-GGUF/model.gguf \
+  -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \
   -o model.gguf
 ```
 
-### `GET /download-hash/:xet_hash_hex`
-Download file directly by XET hash (64 hex characters)
+### `GET /download-hash/:hash`
+
+Download a file directly by XET hash (requires Bearer token).
 
 ```bash
-curl http://localhost:8080/download-hash/ef62b7509a2c65746d7ccbfaeb75da2385ac669a431532e1da9bcd500f49e5bd \
+curl http://localhost:8080/download-hash/89dbfa4888600b29be17ddee8bdbf9c48999c81cb811964eee6b057d8467f927 \
+  -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \
   -o model.safetensors
 ```
 
 ### `GET /`
-Usage instructions (HTML)
+
+Returns HTML usage instructions. Visit http://localhost:8080/ in a browser.
+
+## Authentication
+
+All download requests require Bearer token authentication:
 
 ```bash
-open http://localhost:8080/
+curl http://localhost:8080/download/owner/repo/file \
+  -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \
+  -o file.bin
 ```
 
-## Detailed Setup
+**Benefits:**
+- Multi-tenant support (different users, different tokens)
+- No server-wide token that could leak
+- Per-request authentication and authorization
 
-### WARP Certificate Extraction
+## Multi-Platform Builds
 
-The WARP-compatible image requires the Cloudflare WARP certificate to be extracted from your macOS keychain:
+### AMD64 (x86_64) - For Most Servers
 
 ```bash
-# Extract certificate
-./scripts/extract-warp-cert.sh
-
-# Verify extraction
-ls -lh cloudflare-warp.crt
-openssl x509 -in cloudflare-warp.crt -noout -subject
+docker buildx build \
+  --platform linux/amd64 \
+  --file Dockerfile.proxy \
+  --tag xet-proxy:amd64 \
+  --load \
+  .
 ```
 
-This creates a `cloudflare-warp.crt` file that will be mounted into the Docker container.
+**Image size:** ~10 MB
 
-### Building Images Manually
+### ARM64 (Apple Silicon, ARM servers)
 
 ```bash
-# Standard image
-docker build -t xet-proxy:latest -f Dockerfile .
-
-# WARP-compatible image
-docker build -t xet-proxy:warp -f Dockerfile.warp .
+docker buildx build \
+  --platform linux/arm64 \
+  --file Dockerfile.proxy \
+  --tag xet-proxy:arm64 \
+  --load \
+  .
 ```
 
-### Running Containers Manually
+**Image size:** ~36 MB
 
-**Standard (no WARP):**
+### Multi-Architecture Image
+
 ```bash
-docker run -d \
-  --name xet-proxy \
-  -p 8080:8080 \
-  -e HF_TOKEN=hf_xxx \
-  xet-proxy:latest
+# Build for both platforms (requires pushing to registry)
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --file Dockerfile.proxy \
+  --tag registry.example.com/xet-proxy:latest \
+  --push \
+  .
 ```
 
-**WARP-compatible:**
+## Deployment
+
+### Push to Private Registry
+
 ```bash
-docker run -d \
-  --name xet-proxy-warp \
-  -p 8080:8080 \
-  -e HF_TOKEN=hf_xxx \
-  -v ./cloudflare-warp.crt:/usr/local/share/ca-certificates/cloudflare-warp.crt:ro \
-  xet-proxy:warp
+# Tag for your registry
+docker tag xet-proxy:latest registry.example.com/xet-proxy:latest
+
+# Push
+docker push registry.example.com/xet-proxy:latest
+```
+
+### Export for Airgapped Systems
+
+```bash
+# Save image to tar file
+docker save xet-proxy:latest -o xet-proxy.tar
+
+# Transfer to target system, then:
+docker load -i xet-proxy.tar
 ```
 
 ## Configuration
 
 ### Environment Variables
 
-- `HF_TOKEN` (required): Your HuggingFace API token
-- `PORT` (optional): HTTP port to listen on (default: 8080)
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `PORT` | No | 8080 | HTTP server port |
+| `ZIG_BIN_PATH` | No | /usr/local/bin/xet-download | Path to Zig CLI binary |
 
-### Port Mapping
+**Note:** `HF_TOKEN` is no longer required as environment variable. Use Bearer tokens in request headers instead.
 
-The default port is `8080`. You can change the host port:
-
-```bash
-# Run on port 3000
-docker run -p 3000:8080 -e HF_TOKEN=hf_xxx xet-proxy:latest
-
-# Access at http://localhost:3000
-```
-
-## Usage Examples
-
-### Download a Model
+### Example with Custom Port
 
 ```bash
-# Download MiMo-7B model (7.55 GB)
-curl http://localhost:8080/download/jedisct1/MiMo-7B-RL-GGUF/MiMo-7B-RL-Q8_0.gguf \
-  -o MiMo-7B-RL-Q8_0.gguf
-
-# Shows progress with curl
-curl http://localhost:8080/download/jedisct1/MiMo-7B-RL-GGUF/MiMo-7B-RL-Q8_0.gguf \
-  -o model.gguf \
-  --progress-bar
-```
-
-### Download by Hash
-
-```bash
-# If you know the XET hash, download directly
-curl http://localhost:8080/download-hash/89dbfa4888600b29be17ddee8bdbf9c48999c81cb811964eee6b057d8467f927 \
-  -o model.safetensors
-```
-
-### Using with wget
-
-```bash
-wget http://localhost:8080/download/jedisct1/MiMo-7B-RL-GGUF/MiMo-7B-RL-Q8_0.gguf \
-  -O model.gguf
-```
-
-### Python Example
-
-```python
-import requests
-
-url = "http://localhost:8080/download/jedisct1/MiMo-7B-RL-GGUF/MiMo-7B-RL-Q8_0.gguf"
-
-with requests.get(url, stream=True) as r:
-    r.raise_for_status()
-    with open('model.gguf', 'wb') as f:
-        for chunk in r.iter_content(chunk_size=8192):
-            f.write(chunk)
+docker run -d -p 9000:9000 -e PORT=9000 xet-proxy:latest
 ```
 
 ## Troubleshooting
 
-### Health Check Fails
+### Container Won't Start
 
 ```bash
 # Check logs
 docker logs xet-proxy
 
-# Check if container is running
-docker ps | grep xet-proxy
-
-# Test manually
-curl -v http://localhost:8080/health
-```
-
-### Certificate Errors (WARP mode)
-
-```bash
-# Verify certificate is mounted
-docker exec xet-proxy-warp ls -l /usr/local/share/ca-certificates/
-
-# Check if certificate was added to trust store
-docker exec xet-proxy-warp cat /etc/ssl/certs/ca-certificates.crt | grep Cloudflare
-```
-
-### HF_TOKEN Not Set
-
-```bash
-# Check environment variable is passed
-docker exec xet-proxy-warp env | grep HF_TOKEN
-
-# If missing, recreate container with -e HF_TOKEN=hf_xxx
-```
-
-### Connection Refused
-
-```bash
-# Make sure port 8080 is not in use
+# Check if port is already in use
 lsof -i :8080
+```
 
-# Check firewall settings
-# Check Docker network settings
-docker network inspect bridge
+### Downloads Fail
+
+```bash
+# Verify Bearer token is provided
+curl -i http://localhost:8080/download/owner/repo/file \
+  -H "Authorization: Bearer hf_token"
+
+# Should see HTTP 200, not 401 Unauthorized
+
+# Check container logs for errors
+docker logs -f xet-proxy
+```
+
+### Permission Denied Errors
+
+The container runs as non-root user (UID 1000). Ensure any mounted volumes have appropriate permissions.
+
+### Check Container Health
+
+```bash
+# View health status
+docker inspect xet-proxy | grep -A 10 Health
+
+# Manual health check
+docker exec xet-proxy wget -qO- http://localhost:8080/health
 ```
 
 ## Performance
 
-**Expected performance:**
-- Download speed: ~20-30 MB/s (depends on network and HuggingFace bandwidth)
-- Memory usage: ~200-500MB (bounded by parallel fetcher)
-- Parallel chunks: 4-8 concurrent fetches
-- Startup time: < 2 seconds
-
-**Performance tips:**
-- Use WARP-compatible image to avoid disabling/enabling WARP
-- Multiple concurrent downloads are supported
-- For high load, run multiple containers behind a load balancer
+Tested with 7.73GB model download:
+- **Speed:** 35-45 MB/s average
+- **Memory:** 200-500 MB
+- **CPU:** 1-2 cores
+- **Time:** ~3-4 minutes for 7.5GB file
 
 ## Security
 
-- Container runs as non-root user (UID 1000)
-- HF_TOKEN is never logged or exposed in API responses
-- WARP certificate is mounted read-only
-- No persistent storage (stateless)
-- Health checks use minimal permissions
+- ✅ Runs as non-root user (UID 1000)
+- ✅ No tokens stored server-side
+- ✅ Bearer token authentication per-request
+- ✅ Input validation on all endpoints
+- ✅ Health checks with minimal permissions
+- ✅ Alpine Linux base (minimal attack surface)
 
-## Updating
+## Docker Compose
 
-```bash
-# Pull latest code
-git pull
+Example `docker-compose.proxy.yml`:
 
-# Rebuild image
-docker-compose build
-
-# Recreate container
-docker-compose down
-docker-compose up -d
+```yaml
+services:
+  xet-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.proxy
+    container_name: xet-proxy
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ZIG_BIN_PATH=/usr/local/bin/xet-download
+      - RUST_LOG=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
 ```
 
-## Logs
+## Advanced Usage
+
+### Resource Limits
 
 ```bash
-# Follow logs
+docker run -d \
+  -p 8080:8080 \
+  --memory="1g" \
+  --cpus="2" \
+  --name xet-proxy \
+  xet-proxy:latest
+```
+
+### Custom Logging
+
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -e RUST_LOG=debug \
+  --name xet-proxy \
+  xet-proxy:latest
+```
+
+### Multiple Instances (Load Balancing)
+
+```bash
+# Start multiple instances on different ports
+docker run -d -p 8081:8080 --name xet-proxy-1 xet-proxy:latest
+docker run -d -p 8082:8080 --name xet-proxy-2 xet-proxy:latest
+docker run -d -p 8083:8080 --name xet-proxy-3 xet-proxy:latest
+
+# Use nginx or another load balancer to distribute traffic
+```
+
+## Monitoring
+
+### Prometheus Metrics
+
+The proxy doesn't currently expose Prometheus metrics, but you can monitor via:
+
+```bash
+# Container stats
+docker stats xet-proxy
+
+# Logs
 docker logs -f xet-proxy
 
-# Last 100 lines
-docker logs --tail 100 xet-proxy
-
-# Since timestamp
-docker logs --since 2024-01-01T00:00:00 xet-proxy
+# Health check endpoint
+watch -n 5 'curl -s http://localhost:8080/health'
 ```
-
-## Stopping and Removing
-
-```bash
-# Stop
-docker-compose stop
-
-# Stop and remove
-docker-compose down
-
-# Remove with volumes
-docker-compose down -v
-
-# Remove image
-docker rmi xet-proxy:latest
-```
-
-## Advanced
-
-### Custom Zig Version
-
-```bash
-# Build with different Zig version
-docker build \
-  --build-arg ZIG_VERSION=0.16.0-dev.2100+abcdef123 \
-  -t xet-proxy:custom \
-  -f Dockerfile .
-```
-
-### Multi-Stage Build Inspection
-
-```bash
-# Build only the builder stage
-docker build --target builder -t xet-proxy-builder .
-
-# Inspect builder
-docker run -it xet-proxy-builder sh
-```
-
-### Kubernetes Deployment
-
-See `kubernetes/` directory for example manifests (if available).
 
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/yourusername/proxy-xet/issues
+- GitHub Issues: https://github.com/leo-ars/proxy-xet/issues
 - XET Protocol Spec: https://jedisct1.github.io/draft-denis-xet/draft-denis-xet.html
