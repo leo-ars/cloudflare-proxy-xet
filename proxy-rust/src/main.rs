@@ -12,7 +12,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -45,7 +45,8 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // Get configuration from environment
-    let hf_token = std::env::var("HF_TOKEN").expect("HF_TOKEN environment variable must be set");
+    // HF_TOKEN is optional - can be provided per-request via Authorization header
+    let hf_token = std::env::var("HF_TOKEN").unwrap_or_else(|_| String::new());
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "8080".to_string())
         .parse::<u16>()
@@ -131,17 +132,36 @@ async fn root() -> Response {
         <pre>curl http://localhost:8080/download-hash/ef62b750... -o model.safetensors</pre>
     </div>
     
+    <h2>Authentication</h2>
+    <p>Two methods available (Bearer token takes priority):</p>
+    
+    <h3>Method 1: Environment Variable</h3>
+    <pre>
+export HF_TOKEN=hf_xxxxxxxxxxxxx
+docker run -e HF_TOKEN=$HF_TOKEN xet-proxy:latest
+curl http://localhost:8080/download/owner/repo/file -o file.bin
+    </pre>
+    
+    <h3>Method 2: Bearer Token (Per-request)</h3>
+    <pre>
+curl http://localhost:8080/download/owner/repo/file \\
+  -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \\
+  -o file.bin
+    </pre>
+    
     <h2>Examples</h2>
     <pre>
-# Download MiMo-7B model
+# Download MiMo-7B model with Bearer token
 curl http://localhost:8080/download/jedisct1/MiMo-7B-RL-GGUF/MiMo-7B-RL-Q8_0.gguf \\
+  -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \\
   -o model.gguf
 
-# Download by hash
+# Download by hash with Bearer token
 curl http://localhost:8080/download-hash/89dbfa4888600b29be17ddee8bdbf9c48999c81cb811964eee6b057d8467f927 \\
+  -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \\
   -o model.safetensors
 
-# Check health
+# Check health (no auth required)
 curl http://localhost:8080/health
     </pre>
 </body>
@@ -156,6 +176,31 @@ curl http://localhost:8080/health
         .unwrap()
 }
 
+/// Extract HF token from request headers, falling back to environment variable
+fn extract_token(headers: &HeaderMap, fallback: &str) -> Result<String, AppError> {
+    // Try Authorization: Bearer header first
+    if let Some(auth_header) = headers.get(header::AUTHORIZATION) {
+        if let Ok(auth_str) = auth_header.to_str() {
+            // Check if it starts with "Bearer "
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                if !token.is_empty() {
+                    return Ok(token.to_string());
+                }
+            }
+        }
+    }
+    
+    // Fall back to environment variable token
+    if !fallback.is_empty() {
+        return Ok(fallback.to_string());
+    }
+    
+    // No token available
+    Err(AppError::Unauthorized(
+        "No HF_TOKEN provided. Set HF_TOKEN environment variable or use Authorization: Bearer header".to_string()
+    ))
+}
+
 /// Health check endpoint
 async fn health() -> Json<HealthResponse> {
     Json(HealthResponse {
@@ -167,15 +212,19 @@ async fn health() -> Json<HealthResponse> {
 /// Download file by repository path
 async fn download_by_path(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path((owner, repo, file)): Path<(String, String, String)>,
 ) -> Result<Response, AppError> {
     let repo_id = format!("{}/{}", owner, repo);
     info!("Download request: repo={}, file={}", repo_id, file);
 
+    // Extract token from headers or use environment variable
+    let hf_token = extract_token(&headers, &state.hf_token)?;
+
     // First, list files to get the XET hash
     let output = Command::new(&state.zig_bin_path)
         .arg(&repo_id)
-        .env("HF_TOKEN", &state.hf_token)
+        .env("HF_TOKEN", &hf_token)
         .output()
         .await
         .map_err(|e| AppError::Internal(format!("Failed to execute zig binary: {}", e)))?;
@@ -208,12 +257,13 @@ async fn download_by_path(
     info!("Found XET hash for {}: {}", file, hash);
 
     // Now download by hash
-    download_by_hash_impl(state, hash).await
+    download_by_hash_impl(state, hash, hf_token).await
 }
 
 /// Download file by XET hash
 async fn download_by_hash(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(hash): Path<String>,
 ) -> Result<Response, AppError> {
     info!("Download by hash: {}", hash);
@@ -225,20 +275,24 @@ async fn download_by_hash(
         ));
     }
 
-    download_by_hash_impl(state, hash).await
+    // Extract token from headers or use environment variable
+    let hf_token = extract_token(&headers, &state.hf_token)?;
+
+    download_by_hash_impl(state, hash, hf_token).await
 }
 
 /// Internal implementation of hash-based download
 async fn download_by_hash_impl(
     state: Arc<AppState>,
     hash: String,
+    hf_token: String,
 ) -> Result<Response, AppError> {
     // Spawn the Zig CLI process to download the file
     // We'll use a temporary repo for the token, but download by hash directly
     let mut child = Command::new(&state.zig_bin_path)
         .arg("jedisct1/MiMo-7B-RL-GGUF") // Temporary repo for token
         .arg(&hash) // Pass hash as second argument
-        .env("HF_TOKEN", &state.hf_token)
+        .env("HF_TOKEN", &hf_token)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
@@ -285,6 +339,7 @@ async fn download_by_hash_impl(
 enum AppError {
     BadRequest(String),
     NotFound(String),
+    Unauthorized(String),
     Internal(String),
 }
 
@@ -293,6 +348,7 @@ impl IntoResponse for AppError {
         let (status, message) = match self {
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
             AppError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
         };
 

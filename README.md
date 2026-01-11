@@ -53,10 +53,38 @@ export ZIG_BIN_PATH=./zig-out/bin/xet-download
 ./proxy-rust/target/release/xet-proxy
 ```
 
+## Authentication
+
+The proxy supports flexible authentication with automatic fallback:
+
+### Option 1: Bearer Token (Recommended for multi-user)
+
+Pass token with each request using the `Authorization` header:
+
+```bash
+curl http://localhost:8080/download/owner/repo/file \
+  -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \
+  -o file.bin
+```
+
+### Option 2: Environment Variable (Convenient for single-user)
+
+Set once, applies to all requests:
+
+```bash
+export HF_TOKEN=hf_xxxxxxxxxxxxx
+docker run -e HF_TOKEN=$HF_TOKEN xet-proxy:latest
+
+# No header needed
+curl http://localhost:8080/download/owner/repo/file -o file.bin
+```
+
+**Priority:** Bearer token takes precedence over environment variable. This allows multi-tenant deployments where different users can provide their own tokens per request.
+
 ## API Endpoints
 
 ### GET /health
-Health check
+Health check (no authentication required)
 ```bash
 curl http://localhost:8080/health
 # Response: {"status":"ok","version":"0.1.0"}
@@ -65,13 +93,17 @@ curl http://localhost:8080/health
 ### GET /download/:owner/:repo/*file
 Download file by repository path
 ```bash
-curl http://localhost:8080/download/jedisct1/MiMo-7B-RL-GGUF/model.gguf -o model.gguf
+curl http://localhost:8080/download/jedisct1/MiMo-7B-RL-GGUF/model.gguf \
+  -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \
+  -o model.gguf
 ```
 
 ### GET /download-hash/:hash
 Download file directly by XET hash (faster)
 ```bash
-curl http://localhost:8080/download-hash/ef62b7509a2c...5bd -o model.safetensors
+curl http://localhost:8080/download-hash/ef62b7509a2c...5bd \
+  -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \
+  -o model.safetensors
 ```
 
 ## Architecture
