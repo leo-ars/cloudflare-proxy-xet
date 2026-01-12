@@ -1,5 +1,7 @@
 # XET Proxy - Cloudflare Deployment Quick Start
 
+> **Disclaimer**: Independent community project, not an official Cloudflare product. See [DISCLAIMER.md](DISCLAIMER.md).
+
 ## Prerequisites ✅
 
 - [ ] Node.js 18+ installed (`node --version`)

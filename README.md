@@ -7,6 +7,8 @@
 [![XET Protocol](https://img.shields.io/badge/XET-Protocol%20Compliant-green)](https://jedisct1.github.io/draft-denis-xet/draft-denis-xet.html)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE)
 
+> **Disclaimer:** This is an independent project by [@leo-ars](https://github.com/leo-ars) and is not affiliated with, officially maintained by, or endorsed by Cloudflare, Inc. Cloudflare®, Cloudflare Workers®, and related trademarks are property of Cloudflare, Inc. This project uses Cloudflare Workers as a deployment platform but is not an official Cloudflare product.
+
 <p align="center">
   <img src=".media/logo.jpg" />
 </p>

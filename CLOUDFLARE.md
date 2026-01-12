@@ -2,6 +2,8 @@
 
 This guide explains how to deploy the XET Proxy Server as a Cloudflare Workers Container, enabling global distribution and automatic scaling.
 
+> **Note**: This is an independent community project and is not an official Cloudflare product. See [DISCLAIMER.md](DISCLAIMER.md) for details.
+
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
