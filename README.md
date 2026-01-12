@@ -2,26 +2,74 @@
 
 **Built by [@leo-ars](https://github.com/leo-ars)** based on [@jedisct1](https://github.com/jedisct1)'s [zig-xet](https://github.com/jedisct1/zig-xet)
 
+[![Deploy to Cloudflare](https://img.shields.io/badge/Deploy-Cloudflare%20Workers-orange)](CLOUDFLARE.md)
+[![Docker](https://img.shields.io/badge/Docker-Multi--platform-blue)](DOCKER.md)
+[![XET Protocol](https://img.shields.io/badge/XET-Protocol%20Compliant-green)](https://jedisct1.github.io/draft-denis-xet/draft-denis-xet.html)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE)
+
 <p align="center">
   <img src=".media/logo.jpg" />
 </p>
 
-A production-ready HTTP proxy server for the XET protocol, enabling efficient streaming downloads of large ML models from HuggingFace.
+A production-ready HTTP proxy server for the XET protocol, enabling efficient streaming downloads of large ML models from HuggingFace. Deploy globally to Cloudflare's edge network or self-host with Docker.
 
 ## Overview
 
 This project combines Zig's XET protocol implementation with a high-performance Rust HTTP server to provide a scalable proxy for downloading models and datasets. Files are streamed directly to clients without buffering, making it ideal for serving large models in production environments.
 
 **Key Features:**
-- 🚀 Streaming downloads (no disk buffering)
-- 🔄 Multi-platform Docker support (AMD64, ARM64)
-- ⚡ Fast performance (~35-45 MB/s)
-- 🔒 Secure, non-root container execution
-- 📦 Small footprint (10-40 MB Docker images)
+- 🌍 **Global edge deployment** via Cloudflare Workers Containers
+- 🚀 **Streaming downloads** (no disk buffering)
+- 📈 **Automatic scaling** with pay-per-use pricing
+- ⚡ **Fast performance** (~35-45 MB/s)
+- 🔄 **Multi-platform** Docker support (AMD64, ARM64)
+- 🔒 **Secure** authentication via Bearer tokens
+- 📦 **Small footprint** (10-40 MB Docker images)
+
+## Deployment Options
+
+| Feature | Cloudflare Workers | Docker Self-Hosted |
+|---------|-------------------|-------------------|
+| **Setup Time** | 5 minutes | 15-30 minutes |
+| **Global CDN** | ✅ 300+ cities | ❌ Single location |
+| **Auto-scaling** | ✅ Automatic | ❌ Manual |
+| **Monitoring** | ✅ Built-in dashboard | ⚙️ Setup required |
+| **Maintenance** | ✅ Zero | ❌ Manual updates |
+| **Cost** | 💰 Pay-per-use (~$5-15/mo) | 💰 Fixed server cost |
+| **Cold starts** | ⚡ 2-3 seconds | ✅ None (if 24/7) |
+| **Best for** | Variable traffic, global users | Steady traffic, specific region |
 
 ## Quick Start
 
-### Docker (Recommended)
+### Cloudflare Workers Containers (Recommended for Production)
+
+Deploy to Cloudflare's global edge network in 3 commands:
+
+```bash
+npm install           # Install dependencies
+npm run cf:login      # Authenticate with Cloudflare
+npm run cf:deploy     # Deploy globally (takes 5-10 min first time)
+```
+
+Your proxy will be live at: `https://xet-proxy-container.YOUR-SUBDOMAIN.workers.dev`
+
+**Test your deployment:**
+```bash
+# Health check (no auth needed)
+curl https://xet-proxy-container.YOUR-SUBDOMAIN.workers.dev/health
+
+# Download a file
+curl https://xet-proxy-container.YOUR-SUBDOMAIN.workers.dev/download/jedisct1/MiMo-7B-RL-GGUF/model.gguf \
+  -H "Authorization: Bearer hf_xxxxxxxxxxxxx" \
+  -o model.gguf
+
+# Or use the test script
+./test-cloudflare.sh https://xet-proxy-container.YOUR-SUBDOMAIN.workers.dev hf_your_token
+```
+
+📚 **See [CLOUDFLARE.md](CLOUDFLARE.md) for complete guide** including cost estimates, scaling, and troubleshooting.
+
+### Docker (Self-Hosted)
 
 ```bash
 # Build for AMD64 (servers)
@@ -74,6 +122,28 @@ This clean approach allows:
 - **Multi-tenant support**: Different users provide their own tokens per request
 - **Security**: No server-wide token that could be compromised
 - **Flexibility**: Each request can use a different token if needed
+
+## Features
+
+### 🌍 Global Edge Deployment
+Deploy to Cloudflare's network of 300+ cities worldwide. Your proxy automatically runs near your users for minimal latency.
+
+### 🔐 Secure Multi-Tenant Authentication
+Bearer token authentication allows multiple users to share the same proxy while using their own HuggingFace credentials. No server-side token storage.
+
+### ⚡ High-Performance Streaming
+Files stream directly from HuggingFace through the proxy to clients without disk buffering. Tested at 35-45 MB/s with low memory usage (200-500 MB).
+
+### 📈 Automatic Scaling (Cloudflare)
+Pay only for what you use. Containers automatically sleep when idle and wake up on-demand. Manual scaling for Docker deployments.
+
+### 🔄 XET Protocol Compliance
+Full implementation of the XET protocol with content-defined chunking, BLAKE3 hashing, LZ4 compression, and deduplication. Cross-verified with the Rust reference implementation.
+
+### 📦 Minimal Footprint
+- Cloudflare: ~10 MB container image
+- Docker AMD64: ~10 MB
+- Docker ARM64: ~36 MB
 
 ## API Endpoints
 
@@ -237,10 +307,22 @@ The Zig implementation is cross-verified against the reference implementation to
 
 ## Documentation
 
-- [CLOUDFLARE.md](CLOUDFLARE.md) - **Cloudflare Workers Containers deployment** (recommended)
-- [DOCKER.md](DOCKER.md) - Docker self-hosted deployment guide
-- [AGENTS.md](AGENTS.md) - Developer guide for AI agents
-- [worker/README.md](worker/README.md) - Cloudflare Worker quick reference
+### Deployment Guides
+- 🌟 [CLOUDFLARE.md](CLOUDFLARE.md) - **Cloudflare Workers Containers** (recommended for production)
+  - Complete deployment guide with examples
+  - Cost estimation ($5-15/mo typical)
+  - Scaling and monitoring
+  - Troubleshooting
+- 🐳 [DOCKER.md](DOCKER.md) - **Docker self-hosted** deployment
+  - Multi-platform builds (AMD64, ARM64)
+  - Private registry deployment
+  - Production configurations
+
+### Quick References
+- ⚡ [QUICKSTART.md](QUICKSTART.md) - One-page cheat sheet
+- 💻 [CURL_EXAMPLES.md](CURL_EXAMPLES.md) - Command-line examples
+- 📦 [worker/README.md](worker/README.md) - Cloudflare Worker code reference
+- 🤖 [AGENTS.md](AGENTS.md) - Developer guide for AI coding agents
 
 ## Credits
 
