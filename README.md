@@ -37,7 +37,7 @@ This project combines Zig's XET protocol implementation with a high-performance 
 | **Auto-scaling** | ✅ Automatic | ❌ Manual |
 | **Monitoring** | ✅ Built-in dashboard | ⚙️ Setup required |
 | **Maintenance** | ✅ Zero | ❌ Manual updates |
-| **Cost** | 💰 Pay-per-use (~$5-15/mo) | 💰 Fixed server cost |
+| **Cost** | 💰 Pay-per-use | 💰 Fixed server cost |
 | **Cold starts** | ⚡ 2-3 seconds | ✅ None (if 24/7) |
 | **Best for** | Variable traffic, global users | Steady traffic, specific region |
 
