@@ -1,4 +1,4 @@
-# proxy-xet
+# cloudflare-proxy-xet
 
 **Built by [@leo-ars](https://github.com/leo-ars)** based on [@jedisct1](https://github.com/jedisct1)'s [zig-xet](https://github.com/jedisct1/zig-xet)
 
