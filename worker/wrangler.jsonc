@@ -1,0 +1,62 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "xet-proxy-container",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-01-12",
+  
+  // Container configuration
+  "containers": [
+    {
+      // The Durable Object class name from your Worker code
+      "class_name": "XetProxyContainer",
+      
+      // Path to Dockerfile (relative to worker directory)
+      "image": "../Dockerfile.proxy",
+      
+      // Maximum number of concurrent container instances
+      // Adjust based on expected load
+      "max_instances": 10,
+      
+      // Instance type - determines CPU, memory, and disk
+      // Options: lite, basic, standard-1, standard-2, standard-3, standard-4
+      // See: https://developers.cloudflare.com/containers/platform-details/limits/
+      "instance_type": "standard-1",
+      
+      // Rollout configuration for gradual deployments
+      // First update 10% of instances, then the remaining 90%
+      "rollout_step_percentage": [10, 100],
+      
+      // Wait at least 5 minutes before updating an active container
+      "rollout_active_grace_period": 300
+    }
+  ],
+  
+  // Durable Object bindings
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "XET_PROXY",
+        "class_name": "XetProxyContainer"
+      }
+    ]
+  },
+  
+  // Database migrations for Durable Objects
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["XetProxyContainer"]
+    }
+  ],
+  
+  // Enable observability for logs and metrics
+  "observability": {
+    "enabled": true
+  },
+  
+  // Optional: Uncomment to set default HF_TOKEN
+  // Note: Users can also pass token via Authorization header
+  // "vars": {
+  //   "HF_TOKEN": "hf_your_token_here"
+  // }
+}

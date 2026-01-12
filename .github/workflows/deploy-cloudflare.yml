@@ -1,0 +1,111 @@
+# GitHub Actions workflow for deploying to Cloudflare Workers Containers
+# 
+# This workflow automatically deploys your XET Proxy to Cloudflare when:
+# - You push to the main branch
+# - You manually trigger the workflow
+# - You create a release tag
+#
+# Setup instructions:
+# 1. Generate a Cloudflare API token: https://dash.cloudflare.com/profile/api-tokens
+#    - Use "Edit Cloudflare Workers" template
+#    - Or create custom token with: Workers Scripts (Edit), Workers R2 Storage (Edit), Durable Objects (Edit)
+# 
+# 2. Add the token to GitHub Secrets:
+#    - Go to: Settings → Secrets and variables → Actions
+#    - Create a new repository secret named: CLOUDFLARE_API_TOKEN
+#    - Paste your API token
+#
+# 3. Get your Cloudflare Account ID:
+#    - Visit: https://dash.cloudflare.com
+#    - Copy your Account ID from the right sidebar
+#    - Add it as a secret named: CLOUDFLARE_ACCOUNT_ID
+#
+# 4. (Optional) Uncomment the workflow triggers below to enable automatic deployments
+
+name: Deploy to Cloudflare Workers
+
+on:
+  # Uncomment to enable automatic deployment on push to main
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'worker/**'
+  #     - 'proxy-rust/**'
+  #     - 'src/**'
+  #     - 'Dockerfile.proxy'
+  #     - '.github/workflows/deploy-cloudflare.yml'
+
+  # Uncomment to enable deployment on release tags
+  # release:
+  #   types: [published]
+
+  # Manual workflow trigger
+  workflow_dispatch:
+    inputs:
+      rollout_strategy:
+        description: 'Rollout strategy'
+        required: true
+        default: 'gradual'
+        type: choice
+        options:
+          - gradual
+          - immediate
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Cloudflare
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Deploy to Cloudflare
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ "${{ github.event.inputs.rollout_strategy }}" = "immediate" ]; then
+            npx wrangler deploy --containers-rollout=immediate
+          else
+            npx wrangler deploy
+          fi
+
+      - name: Get deployment info
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "Checking container status..."
+          npx wrangler containers list
+
+      - name: Create deployment summary
+        run: |
+          echo "## Deployment Successful ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Your XET Proxy has been deployed to Cloudflare Workers Containers!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Visit the [Cloudflare Dashboard](https://dash.cloudflare.com)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Navigate to: Workers & Pages → Containers" >> $GITHUB_STEP_SUMMARY
+          echo "3. View your deployment at: \`xet-proxy-container.YOUR-SUBDOMAIN.workers.dev\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Your Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "curl https://xet-proxy-container.YOUR-SUBDOMAIN.workers.dev/health" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

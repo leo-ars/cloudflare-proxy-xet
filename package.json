@@ -1,0 +1,35 @@
+{
+  "name": "cloudflare-proxy-xet",
+  "version": "1.0.0",
+  "description": "**Built by [@leo-ars](https://github.com/leo-ars)** based on [@jedisct1](https://github.com/jedisct1)'s [zig-xet](https://github.com/jedisct1/zig-xet)",
+  "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "cf:deploy": "cd worker && npx wrangler deploy",
+    "cf:deploy:immediate": "cd worker && npx wrangler deploy --containers-rollout=immediate",
+    "cf:dev": "cd worker && npx wrangler dev",
+    "cf:tail": "cd worker && npx wrangler tail",
+    "cf:status": "cd worker && npx wrangler containers list",
+    "cf:images": "cd worker && npx wrangler containers images list",
+    "cf:login": "npx wrangler login"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leo-ars/cloudflare-proxy-xet.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/leo-ars/cloudflare-proxy-xet/issues"
+  },
+  "homepage": "https://github.com/leo-ars/cloudflare-proxy-xet#readme",
+  "devDependencies": {
+    "@cloudflare/containers": "^0.0.31",
+    "wrangler": "^4.58.0"
+  }
+}

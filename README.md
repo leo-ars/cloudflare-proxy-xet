@@ -137,13 +137,49 @@ docker buildx build --platform linux/arm64 -f Dockerfile.proxy -t xet-proxy:arm6
 
 ## Deployment
 
-### Push to Private Registry
+### Cloudflare Workers Containers (Recommended for Production)
+
+Deploy globally with automatic scaling using Cloudflare's edge network:
+
+```bash
+# Install dependencies
+npm install
+
+# Login to Cloudflare
+npm run cf:login
+
+# Deploy to Cloudflare
+npm run cf:deploy
+```
+
+Your proxy will be available at: `https://xet-proxy-container.YOUR-SUBDOMAIN.workers.dev`
+
+**Benefits:**
+- 🌍 Global distribution across 300+ cities
+- 📈 Automatic scaling and load balancing (coming soon)
+- 💰 Pay only for active usage (includes free tier)
+- 📊 Built-in monitoring and logs
+- 🔒 DDoS protection and security
+
+See [CLOUDFLARE.md](CLOUDFLARE.md) for comprehensive deployment guide.
+
+**Quick commands:**
+```bash
+npm run cf:dev         # Local development
+npm run cf:deploy      # Deploy to production
+npm run cf:tail        # Live tail logs
+npm run cf:status      # Check container status
+```
+
+### Docker Self-Hosted
+
+#### Push to Private Registry
 ```bash
 docker tag xet-proxy:latest registry.example.com/xet-proxy:latest
 docker push registry.example.com/xet-proxy:latest
 ```
 
-### Export for Airgapped Systems
+#### Export for Airgapped Systems
 ```bash
 docker save xet-proxy:latest -o xet-proxy.tar
 # Transfer xet-proxy.tar to target system
@@ -201,9 +237,10 @@ The Zig implementation is cross-verified against the reference implementation to
 
 ## Documentation
 
-- [DOCKER.md](DOCKER.md) - Docker deployment guide
+- [CLOUDFLARE.md](CLOUDFLARE.md) - **Cloudflare Workers Containers deployment** (recommended)
+- [DOCKER.md](DOCKER.md) - Docker self-hosted deployment guide
 - [AGENTS.md](AGENTS.md) - Developer guide for AI agents
-- [PROXY_README.md](PROXY_README.md) - Detailed proxy documentation
+- [worker/README.md](worker/README.md) - Cloudflare Worker quick reference
 
 ## Credits
 

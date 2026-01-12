@@ -42,3 +42,13 @@ test-download.*
 *.tar.gz
 *.zip
 downloads/
+
+# Node.js / NPM
+node_modules/
+package-lock.json
+
+# Cloudflare Workers
+worker/.wrangler/
+worker/dist/
+.wrangler/
+.dev.vars
